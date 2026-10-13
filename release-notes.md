@@ -15,7 +15,7 @@ An independent Windows companion for your existing Tailscale service.
 - **Taildesk-Setup-0.1.0-x64.exe** — installer with optional desktop and Start menu shortcuts.
 - **Taildesk-Portable-0.1.0-x64.exe** — run without installation.
 
-Requires Windows x64 and an existing, signed-in Tailscale installation. Tested against Tailscale 1.104.1. Tailscale is not bundled. Sign-in, account switching, and file transfers stay in the official app. This release is unsigned unless built with a configured signing certificate.
+Requires Windows x64 and an existing, signed-in Tailscale installation. Tested against Tailscale 1.104.1. Tailscale is not bundled. Sign-in, account switching, and file transfers stay in the official app. These release packages are unsigned.
 
 ## Verification
 

@@ -15,4 +15,4 @@ Completed locally on Windows x64, 2026-10-13.
 
 Live disconnect, reconnect, routing and security-setting changes were not executed. Their confirmation flow and argument construction were tested with fixtures. The installer was generated; the unpacked production executable was smoke tested. No claim is made that the installation wizard or a complete uninstall cycle was exercised.
 
-Packages are unsigned. GitHub CLI authentication returned HTTP 401 for the configured account, so remote repository creation, push, and GitHub Release publication could not be completed. Source and version tag are retained in the local standalone Git repository.
+Packages are unsigned. GitHub CLI authentication initially returned HTTP 401; the user renewed the login on 2026-10-13 and authentication was verified before publication. Source and release artifacts are prepared from the verified local standalone Git repository.
