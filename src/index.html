@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>Taildesk</title><link rel="stylesheet" href="styles.css"></head>
+<body>
+  <aside>
+    <div class="brand"><img src="../build/icon.png" alt=""><span>Taildesk<small>YOUR NETWORK, AT A GLANCE</small></span></div>
+    <div class="nav-label">WORKSPACE</div>
+    <nav aria-label="Main navigation"><button class="nav active" data-page="devices"><span>▦</span> Devices</button><button class="nav" data-page="routing"><span>⇄</span> Exit node</button><button class="nav" data-page="settings"><span>⚙</span> Settings</button><button class="nav" data-page="about"><span>ⓘ</span> About</button></nav>
+    <div class="sidebar-bottom"><div class="service-mark"><i></i> Powered by Tailscale</div><p>Private connections.<br>A familiar place to manage them.</p><button id="official" class="text-button">Open Tailscale app ↗</button><button id="quit" class="text-button">Quit Taildesk</button></div>
+  </aside>
+  <main>
+    <header><div><div class="eyebrow">PERSONAL NETWORK</div><h1 id="page-title">Your devices</h1></div><button id="refresh" class="secondary">↻ Refresh</button></header>
+    <div id="error" class="banner error" role="alert" hidden></div><div id="health" class="banner" hidden></div>
+    <section class="connection"><div class="connection-symbol" id="connection-symbol">↔</div><div class="connection-copy"><div class="status-line"><h2 id="connection-state">Checking connection…</h2><span id="state-badge" class="badge">WAITING</span></div><p id="connection-description">Reading your local Tailscale service</p></div><button id="connect" class="primary" disabled>Connect</button></section>
+    <section id="devices" class="page">
+      <div class="section-heading"><h2>This device</h2><span class="muted">Your Windows connection</span></div><div id="self-card" class="self-card"><p class="muted">Loading device details…</p></div>
+      <div class="section-heading peers-heading"><h2>Other devices <span id="peer-count" class="count">0</span></h2><span id="online-count" class="muted"></span></div>
+      <div class="toolbar"><input id="search" aria-label="Search devices" placeholder="Search name, address, or operating system…"><select id="filter" aria-label="Filter devices"><option value="all">All devices</option><option value="online">Online only</option><option value="offline">Offline only</option></select></div>
+      <div class="device-table"><div class="table-heading"><span>DEVICE</span><span>ADDRESS</span><span>STATUS</span><span>ACTIONS</span></div><div id="peer-list"></div><div id="empty" class="empty" hidden>No devices match your search.</div></div>
+    </section>
+    <section id="routing" class="page" hidden><div class="section-heading"><h2>Choose how you reach the internet</h2></div><div class="panel"><h3>Exit node</h3><p>An exit node routes this PC’s internet traffic through another device in your tailnet.</p><label for="exit-node">Route internet traffic through</label><select id="exit-node" disabled><option value="">None — use this PC’s internet connection</option></select><p id="exit-hint" class="muted"></p><button id="apply-exit" class="primary" disabled>Apply exit node</button></div><div class="note">Changing your exit node affects internet routing. Taildesk asks you to confirm before applying it.</div></section>
+    <section id="settings" class="page" hidden><div class="section-heading"><h2>Connection preferences</h2></div><div id="settings-list" class="panel"></div><div class="note">Settings are read from Tailscale. Each change is confirmed and applied individually.</div></section>
+    <section id="about" class="page" hidden><div class="panel about"><img src="../build/icon.png" alt="Taildesk icon"><h2>Taildesk <span class="muted">0.1.0</span></h2><p>An independent Windows companion for your existing Tailscale installation.</p><p>View devices, copy addresses, check reachability, reconnect, choose an exit node, and manage common connection settings.</p><p class="muted">Tailscale provides authentication, encryption, and networking. Taildesk is not affiliated with or endorsed by Tailscale. This is a functional recreation of common client controls, not a pixel-identical copy.</p><p class="muted">Sign-in, account switching, file transfers, and advanced administration remain in the official Tailscale app. Closing this window keeps Taildesk in the system tray. Quitting Taildesk does not disconnect Tailscale.</p></div></section>
+    <footer><span id="updated">Waiting for service</span><span id="version">LOCAL SERVICE CONNECTION</span></footer>
+  </main>
+  <div id="toast" role="status" hidden></div>
+  <dialog id="ping-dialog"><h2>Device connection check</h2><pre id="ping-result"></pre><button id="close-ping" class="primary">Close</button></dialog>
+  <script src="renderer.js" type="module"></script>
+</body></html>

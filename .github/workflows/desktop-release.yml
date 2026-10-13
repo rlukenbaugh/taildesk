@@ -1,0 +1,56 @@
+name: Desktop Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Validate version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          if ('${{ github.ref_type }}' -eq 'tag' -and '${{ github.ref_name }}' -ne "v$version") { throw 'Tag must match package version' }
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:ui
+      - run: node scripts/smoke.mjs --service-error
+      - name: Package Windows
+        shell: pwsh
+        run: |
+          if ($env:CSC_LINK -and $env:CSC_KEY_PASSWORD) {
+            npx electron-builder --win nsis portable --x64 --publish never -c.win.signExecutable=true
+          } else {
+            Write-Host 'Building unsigned: signing secrets not configured.'
+            npm run dist:win
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Taildesk-Windows
+          path: release/*.exe
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $tag = "v$version"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create $tag --title "Taildesk v$version" --notes-file release-notes.md }
+          gh release upload $tag "release/Taildesk-Setup-$version-x64.exe" "release/Taildesk-Portable-$version-x64.exe" --clobber
