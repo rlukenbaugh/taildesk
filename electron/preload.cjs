@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('taildesk', Object.freeze({
   change: (action, value) => ipcRenderer.invoke('change', action, value),
   ping: ip => ipcRenderer.invoke('ping', ip),
   copy: value => ipcRenderer.invoke('copy', value),
-  openOfficial: () => ipcRenderer.invoke('open-official'),
+  signIn: () => ipcRenderer.invoke('sign-in'),
+  engineInfo: () => ipcRenderer.invoke('engine-info'),
+  engineAction: action => ipcRenderer.invoke('engine-action', action),
   quit: () => ipcRenderer.invoke('quit')
 }));

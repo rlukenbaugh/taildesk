@@ -1,22 +1,24 @@
-# Taildesk v0.1.0
+# Taildesk v0.2.0 — standalone Windows VPN
 
-An independent Windows companion for your existing Tailscale service.
+Taildesk includes its own networking engine and Windows service. The official Tailscale desktop app is no longer required; your existing Tailscale account and hosted network are still used.
 
-## Highlights
+## Changes
 
-- See your devices, connection status, and online peers in one dashboard.
-- Search devices, copy addresses, and check peer reachability.
-- Reconnect or disconnect with confirmation.
-- Choose an exit node and manage common Tailscale settings.
-- Keep Taildesk in the Windows system tray.
+- Bundle source-built Tailscale 1.104.1 engine/CLI, signed Wintun 0.14.1 DLL and dependency notices.
+- Add browser sign-in, independent service controls and optional Windows service startup.
+- Isolate state, pipe, adapter, registry, firewall and DNS ownership from the original app.
+- Keep the Windows user-session connection alive; exit its helper automatically if the UI closes or crashes.
+- Support starting the interface in the tray with --start-hidden.
+- Disable upstream MSI self-updating; require an all-users installation rather than a portable service.
 
-## Downloads
+## Install and migration
 
-- **Taildesk-Setup-0.1.0-x64.exe** — installer with optional desktop and Start menu shortcuts.
-- **Taildesk-Portable-0.1.0-x64.exe** — run without installation.
+**Taildesk-Setup-0.2.0-x64.exe**: Windows x64 installer; administrator approval required; installer is unsigned.
 
-Requires Windows x64 and an existing, signed-in Tailscale installation. Tested against Tailscale 1.104.1. Tailscale is not bundled. Sign-in, account switching, and file transfers stay in the official app. These release packages are unsigned.
+Keep the original installation for rollback. Stop its background service, install Taildesk, start its service and sign in with the same account. Taildesk becomes a separate device. Enabling automatic startup changes the stopped original service to manual startup. Enable Run unattended to keep the VPN connected without the interface. Remove the original app only when satisfied with testing.
 
-## Verification
+## Verification and limits
 
-Release process includes JavaScript syntax checks, service boundary tests, fixture UI smoke tests, a production Windows build, and read-only live-service smoke testing on the development PC. Live network-changing actions are verified with fixtures, not by disrupting the user's connection.
+Source build, binary checksums, unit/fixture UI tests, real isolated engine tests and packaged live UI tests pass. Verified the installed standalone service, adapter, restrictive state permissions, authentication, 12 peers, pings to all 3 online peers, MagicDNS, internet access and saved login after service/installer restart while the original service remained stopped.
+
+Exit-node/subnet changes were tested with fixtures, not changed on the live network. Startup settings and tray behavior are verified; a full Windows reboot was not performed. Account switching and Taildrop controls are not included. This is an independent client, not a full feature-for-feature reproduction of Tailscale.

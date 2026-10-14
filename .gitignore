@@ -5,3 +5,5 @@ test-results/
 *.local.json
 *.log
 .env
+.engine-source/
+engine-bin/

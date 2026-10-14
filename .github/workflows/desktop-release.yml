@@ -27,6 +27,12 @@ jobs:
           $version = (Get-Content package.json | ConvertFrom-Json).version
           if ('${{ github.ref_type }}' -eq 'tag' -and '${{ github.ref_name }}' -ne "v$version") { throw 'Tag must match package version' }
       - run: npm ci
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - run: npm run build:engine
+      - run: npm run test:engine
       - run: npm run build
       - run: npm run lint
       - run: npm test
@@ -36,11 +42,13 @@ jobs:
         shell: pwsh
         run: |
           if ($env:CSC_LINK -and $env:CSC_KEY_PASSWORD) {
-            npx electron-builder --win nsis portable --x64 --publish never -c.win.signExecutable=true
+            node scripts/verify-engine.mjs
+            npx electron-builder --win nsis --x64 --publish never -c.win.signExecutable=true
           } else {
             Write-Host 'Building unsigned: signing secrets not configured.'
             npm run dist:win
           }
+      - run: node scripts/smoke.mjs --packaged
       - uses: actions/upload-artifact@v4
         with:
           name: Taildesk-Windows
@@ -53,4 +61,4 @@ jobs:
           $tag = "v$version"
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) { gh release create $tag --title "Taildesk v$version" --notes-file release-notes.md }
-          gh release upload $tag "release/Taildesk-Setup-$version-x64.exe" "release/Taildesk-Portable-$version-x64.exe" --clobber
+          gh release upload $tag "release/Taildesk-Setup-$version-x64.exe" --clobber

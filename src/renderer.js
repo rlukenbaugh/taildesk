@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 const api = window.taildesk;
-let state = null, prefs = null, refreshing = false, busy = false, toastTimer, pendingExit = null;
+let state = null, prefs = null, engine = null, refreshing = false, busy = false, toastTimer, pendingExit = null;
 const descriptions = {
   'accept-dns': ['Use Tailscale DNS', 'Use the DNS settings supplied by your tailnet.'],
   'accept-routes': ['Use subnet routes', 'Reach private networks advertised by other devices.'],
@@ -39,16 +39,16 @@ function renderStatus() {
   document.querySelector('.connection').classList.toggle('offline', !connected);
   $('connection-state').textContent = connected ? 'Connected to your tailnet' : state.state === 'Stopped' ? 'Tailscale is disconnected' : `Tailscale: ${state.state}`;
   $('state-badge').textContent = connected ? 'CONNECTED' : 'OFFLINE';
-  $('connection-description').textContent = state.tailnet || 'Open the official Tailscale app to sign in.';
-  $('connect').textContent = connected ? 'Disconnect' : state.state === 'Stopped' ? 'Connect' : 'Open Tailscale';
-  $('connect').disabled = busy;
+  $('connection-description').textContent = state.tailnet || (state.state === 'NeedsMachineAuth' ? 'Approve this new device in your Tailscale admin console.' : 'Sign in with your existing Tailscale account.');
+  $('connect').textContent = connected ? 'Disconnect' : state.state === 'Stopped' ? 'Connect' : state.state === 'NeedsMachineAuth' ? 'Awaiting approval' : 'Sign in';
+  $('connect').disabled = busy || !['Running', 'Stopped', 'NeedsLogin'].includes(state.state);
   $('health').textContent = state.health.join('\n'); $('health').hidden = !state.health.length;
   $('self-card').replaceChildren();
   if (state.self) {
     const info = identity(state.self); info.classList.add('self-info'); $('self-card').append(info);
     if (state.self.ips[0]) $('self-card').append(address(state.self.ips[0]));
-  } else $('self-card').append(element('p', 'muted', 'No signed-in device. Open the official Tailscale app to finish setup.'));
-  $('version').textContent = `TAILSCALE ${state.version.split('-')[0]}`;
+  } else $('self-card').append(element('p', 'muted', 'Sign in to add Taildesk as a new device in your existing network.'));
+  $('version').textContent = `BUNDLED ENGINE ${state.version.split('-')[0]}`;
   $('updated').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · Refreshes every 10 seconds`;
   renderPeers();
 }
@@ -75,7 +75,9 @@ async function refresh() {
   if (refreshing || busy) return;
   refreshing = true; $('refresh').disabled = true;
   try {
-    const [s, p] = await Promise.allSettled([call('status'), call('preferences')]);
+    const [s, p, e] = await Promise.allSettled([call('status'), call('preferences'), call('engineInfo')]);
+    engine = e.status === 'fulfilled' ? e.value : null;
+    renderEngine();
     if (s.status === 'rejected') throw s.reason;
     state = s.value; prefs = p.status === 'fulfilled' ? p.value : null;
     error(p.status === 'rejected' ? `Device status is available, but settings could not be read: ${p.reason.message}` : '');
@@ -83,9 +85,29 @@ async function refresh() {
   } catch(e) {
     state = null; prefs = null; pendingExit = null; error(e.message);
     document.querySelector('.connection').classList.add('offline');
-    $('connection-state').textContent = 'Service unavailable'; $('state-badge').textContent = 'UNKNOWN'; $('connection-description').textContent = 'Open Tailscale and refresh to try again.'; $('connect').disabled = true;
+    $('connection-state').textContent = 'Service unavailable'; $('state-badge').textContent = 'OFFLINE'; $('connection-description').textContent = 'Start the Taildesk service to sign in and connect.'; $('connect').disabled = true;
     $('peer-list').replaceChildren(); $('self-card').replaceChildren(element('p', 'muted', 'Live device information is unavailable.')); $('peer-count').textContent = '—'; $('online-count').textContent = ''; $('updated').textContent = 'Refresh failed — retrying automatically'; $('health').hidden = true; renderPreferences();
   } finally { refreshing = false; $('refresh').disabled = false; }
+}
+function renderEngine() {
+  $('engine-description').textContent = !engine ? 'Could not check the service. Refresh to try again.' : !engine.bundled ? 'Engine files are missing. Run the Taildesk installer.' : !engine.installed ? 'Run the Taildesk installer to register its independent VPN service.' : engine.running ? 'Running independently of the official Tailscale app.' : engine.officialRunning ? 'Your original Tailscale service is running. Stop it before starting Taildesk.' : 'Ready to start. Your original Tailscale installation is preserved.';
+  $('engine-start').hidden = !engine?.installed || engine.running;
+  $('engine-start').disabled = busy || engine?.officialRunning === true;
+  $('engine-stop').hidden = !engine?.running; $('engine-stop').disabled = busy;
+  $('engine-autostart').disabled = busy || !engine?.installed || engine.automatic;
+  $('startup-description').textContent = engine?.automatic ? 'Taildesk’s VPN service starts automatically with Windows.' : 'Enable automatic service startup after testing Taildesk. The stopped original Tailscale service will be changed to manual startup to avoid a conflict.';
+}
+async function engineAction(action) {
+  if (busy) return;
+  busy = true; renderEngine();
+  try { const result = await call('engineAction', action); if (!result.cancelled) toast('Service action completed'); }
+  finally { busy = false; await refresh(); }
+}
+async function signIn() {
+  if (busy) return;
+  busy = true; $('connect').disabled = true;
+  try { const result = await call('signIn'); if (!result.cancelled) toast('Complete sign-in in your browser, then return here.'); }
+  finally { busy = false; await refresh(); }
 }
 async function change(action, value) {
   if (busy) return; busy = true; $('connect').disabled = true; renderPreferences();
@@ -99,9 +121,12 @@ for (const b of document.querySelectorAll('[data-page]')) b.onclick = () => {
 };
 $('search').oninput = renderPeers; $('filter').onchange = renderPeers;
 $('refresh').onclick = refresh;
-$('connect').onclick = run(async () => { if (!state) return; if (!['Running', 'Stopped'].includes(state.state)) await call('openOfficial'); else await change(state.state === 'Running' ? 'disconnect' : 'connect'); });
+$('connect').onclick = run(async () => { if (!state) return; if (state.state === 'NeedsLogin') await signIn(); else await change(state.state === 'Running' ? 'disconnect' : 'connect'); });
 $('apply-exit').onclick = run(() => change('exit-node', $('exit-node').value));
 $('exit-node').onchange = () => { pendingExit = $('exit-node').value; };
-$('official').onclick = run(() => call('openOfficial')); $('quit').onclick = run(() => call('quit'));
+$('engine-start').onclick = run(() => engineAction('Start'));
+$('engine-stop').onclick = run(() => engineAction('Stop'));
+$('engine-autostart').onclick = run(() => engineAction('EnableStartup'));
+$('quit').onclick = run(() => call('quit'));
 $('close-ping').onclick = () => $('ping-dialog').close();
 await refresh(); setInterval(refresh, 10000);

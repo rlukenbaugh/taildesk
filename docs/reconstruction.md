@@ -1,5 +1,7 @@
 # Reconstruction evidence and scope
 
+Historical v0.1 record. Version 0.2 uses a bundled source-built engine; see `standalone-engine.md` for current architecture and validation limits.
+
 Inspected on 2026-10-13 using REA MCP and installed CLI help.
 
 ## Observed through REA

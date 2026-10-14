@@ -4,10 +4,11 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 const live = process.argv.includes('--live');
 const packed = process.argv.includes('--packaged');
-const failure = process.argv.includes('--service-error');
+const hidden = process.argv.includes('--start-hidden');
+const failure = process.argv.includes('--service-error') || (packed && !live);
 await mkdir('test-results', { recursive: true });
 const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-const instance = await electron.launch({ ...(packed ? { executablePath: resolve('release/win-unpacked/Taildesk.exe') } : {}), args: packed ? [] : ['.', ...(live ? [] : ['--fixture']), ...(failure ? ['--service-error'] : [])], env });
+const instance = await electron.launch({ ...(packed ? { executablePath: resolve('release/win-unpacked/Taildesk.exe') } : {}), args: [...(packed ? [] : ['.', ...(live ? [] : ['--fixture']), ...(failure ? ['--service-error'] : [])]), ...(hidden ? ['--start-hidden'] : [])], env });
 console.log('Electron launched.');
 try {
   const page = await instance.firstWindow();
@@ -15,11 +16,18 @@ try {
   console.log('Application window opened.');
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.waitForFunction(() => !document.querySelector('#refresh').disabled);
+  if (hidden) {
+    assert.equal(await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), false, 'Startup launch stays in the tray');
+    await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].show());
+  }
   if (failure) {
     assert.equal(await page.locator('#connection-state').innerText(), 'Service unavailable');
     assert.equal(await page.locator('#connect').isDisabled(), true);
     assert.equal(await page.locator('#error').isVisible(), true);
+    assert.match(await page.locator('#engine-description').innerText(), packed ? /installer|original Tailscale|Ready to start/ : /original Tailscale/);
+    assert.equal(await page.locator('#official').count(), 0);
   } else {
+    if (live) await page.waitForFunction(() => document.querySelector('#state-badge').textContent === 'CONNECTED' && document.querySelectorAll('.device-row').length > 0);
     await page.waitForFunction(() => document.querySelector('#connection-state').textContent !== 'Checking connection…');
     assert.notEqual(await page.locator('#connection-state').innerText(), 'Service unavailable');
     const count = await page.locator('.device-row').count(); assert.ok(count >= 1);
@@ -49,7 +57,7 @@ try {
     }
   }
   // Screenshots containing real device names stay local and ignored by Git.
-  await page.screenshot({ path: `test-results/${failure ? 'service-error' : packed ? 'packaged-live' : live ? 'live' : 'fixture'}.png`, fullPage: true });
+  await page.screenshot({ path: `test-results/${packed ? 'packaged' : failure ? 'service-error' : live ? 'live' : 'fixture'}.png`, fullPage: true });
   assert.deepEqual(errors, []);
   console.log(`PASS: ${failure ? 'missing service' : packed ? 'packaged live service (read-only)' : live ? 'live service (read-only)' : 'fixture controls, confirmations, settings, routing and ping'} smoke test.`);
 } finally { await instance.close(); }

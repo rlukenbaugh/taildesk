@@ -1,7 +1,7 @@
 {
   "name": "taildesk",
-  "version": "0.1.0",
-  "description": "An independent Windows companion for your existing Tailscale service.",
+  "version": "0.2.0",
+  "description": "A standalone Windows VPN client for your existing Tailscale network.",
   "author": "rlukenbaugh",
   "license": "MIT",
   "type": "module",
@@ -18,7 +18,9 @@
     "test:ui": "node scripts/smoke.mjs",
     "test:live": "node scripts/smoke.mjs --live",
     "build": "node scripts/build.mjs",
-    "dist:win": "npm run build && electron-builder --win nsis portable --x64 --publish never"
+    "dist:win": "npm run build && node scripts/verify-engine.mjs && electron-builder --win nsis --x64 --publish never",
+    "build:engine": "node scripts/build-engine.mjs",
+    "test:engine": "node scripts/engine-smoke.mjs"
   },
   "devDependencies": {
     "electron": "44.7.1",
@@ -43,21 +45,36 @@
     "win": {
       "icon": "build/icon.ico",
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ],
       "signExecutable": false
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "Taildesk-Setup-${version}-${arch}.${ext}"
+      "artifactName": "Taildesk-Setup-${version}-${arch}.${ext}",
+      "include": "installer/service.nsh",
+      "runAfterFinish": false
     },
-    "portable": {
-      "artifactName": "Taildesk-Portable-${version}-${arch}.${ext}"
-    }
+    "extraResources": [
+      {
+        "from": "engine-bin",
+        "to": "engine",
+        "filter": [
+          "taildesk-cli.exe",
+          "taildesk-engine.exe",
+          "wintun.dll",
+          "manifest.json",
+          "licenses/**/*"
+        ]
+      },
+      {
+        "from": "installer/manage-service.ps1",
+        "to": "engine/manage-service.ps1"
+      }
+    ]
   }
 }

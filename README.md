@@ -1,40 +1,48 @@
 # Taildesk
 
-An independent Windows desktop companion for an existing Tailscale installation. It recreates common client controls in a larger device dashboard with original branding. It is not affiliated with Tailscale and is not a replacement VPN engine or a pixel-identical replica.
+A standalone Windows x64 VPN client for your existing Tailscale network. Version 0.2 bundles its own source-built engine, CLI, Windows service and original signed upstream Wintun DLL. The official desktop app is not required. Your existing Tailscale account and hosted coordination service are still used.
 
-## Windows use
+Verified on Windows: standalone service/adapter, browser sign-in, 12 peers, reachability to all 3 online peers, MagicDNS, internet access, saved login after restart and the packaged UI. Exit-node/subnet changes are covered by UI/command tests but were not changed on the live network. Full Tailscale feature parity is not claimed.
 
-Install and sign in to the official Tailscale Windows app first. Run the Taildesk installer or portable executable. Taildesk reads the service automatically from `C:\Program Files\Tailscale\tailscale.exe` (or the Windows Program Files directory).
+## Install and test
 
-- Devices: live status, address copying, search, online/offline filters, and peer pings.
-- Connection: disconnect and reconnect with saved settings.
-- Exit node: select an advertised online node or return to normal routing.
-- Settings: DNS, subnet routes, blocking incoming connections, unattended mode, and LAN access with an exit node.
-- Every network change requires a native confirmation. Closing the window keeps Taildesk in the tray. Quit from the sidebar or tray menu.
+1. Keep the original installation for rollback. Stop its **Tailscale** Windows service; closing its tray app is insufficient.
+2. Run `Taildesk-Setup-0.2.0-x64.exe` and approve elevation. It installs in `C:\Program Files\Taildesk`, registers a manual-start **Taildesk VPN** service, and does not start networking or modify the original service.
+3. Open Taildesk, select **Start service**, then **Sign in**. Use your existing account and approve the new device if required.
+4. Test peers, DNS, internet and your usual applications. Taildesk has its own device identity, keys and IP; per-device access rules may need updating.
+5. After testing, enable **automatic startup** in Taildesk Settings. This changes the stopped original service to manual startup, preserving it for rollback. Remove the original app later if desired. Enable **Run unattended** to remain connected after quitting the UI or signing out.
 
-Sign-in, account switching, Taildrop, and advanced administration remain in the official app. Closing or uninstalling Taildesk does not disconnect or uninstall Tailscale. Tailscale must already be installed; it is not bundled. Current integration was checked with Windows Tailscale 1.104.1. Older clients without `tailscale get --json` can display devices but settings are disabled with an explanation.
+Rollback: use **Stop service** in Taildesk, then restart the original Tailscale service in Windows Services. Do not run both system VPN engines concurrently. Original credentials are not imported or deleted.
 
-## Development
+Closing the window keeps the UI in the tray. Disconnect stops the VPN connection; Stop service stops the engine. Uninstall removes Taildesk's files and service, preserves private state in `C:\ProgramData\Taildesk`, and does not remove the shared Wintun driver.
 
-Node.js 22 or newer on Windows:
+The installer is unsigned unless signing credentials are configured. Launching with `--start-hidden` opens in the tray for Windows sign-in startup. Portable distribution is no longer provided: a privileged VPN service must execute from administrator-protected storage.
+
+## Features
+
+Browser sign-in; devices, search/filter, address copying and pings; connect/disconnect; exit nodes; DNS, subnet routes, incoming connection, LAN-access and unattended preferences; service controls. Account switching, Taildrop UI, custom control servers and advanced administration are not included. Taildesk is not affiliated with or endorsed by Tailscale.
+
+## Build and verify
+
+Node.js 22+ and Go 1.27.2 on Windows x64. `TAILDESK_GO` may select an absolute Go executable.
 
 ```powershell
 npm ci
+npm run build:engine
 npm run build
 npm run lint
 npm test
+npm run test:engine
 npm run test:ui
-npm run test:live
-npm start
+node scripts/smoke.mjs --service-error
 npm run dist:win
+node scripts/smoke.mjs --packaged
 ```
 
-`test:ui` uses fictional data and tests native confirmation cancellation and acceptance. `test:live` only reads the installed service. `node scripts/smoke.mjs --live --packaged` checks the packaged executable. `node scripts/smoke.mjs --service-error` checks unavailable-service handling. Test screenshots and full REA evidence remain local and are excluded from Git.
+The engine pins Tailscale 1.104.1 commit `9a522a9786c97eb7910c01ccb7bd66557b04c910`. Explicit source patches isolate service/pipe/state/adapter/registry/firewall/DNS identities, preserving upstream protocol, cryptography and access checks. The upstream MSI self-updater is compiled out. Go checks module integrity; Wintun 0.14.1 is verified against upstream's SHA-256. Binary hashes and dependency license/copyright files ship with the installer. Source downloads and build outputs are ignored by Git.
 
-## Architecture and boundaries
+`test:engine` runs a private userspace-only engine without authentication, adapter or routing changes and checks CLI IPC, preferences and the persistent user-session watcher. UI fixtures contain fictional devices. Packaged smoke expects no installed Taildesk service; run before installation. `test:live` reads an installed, signed-in Taildesk service. Screenshots of real devices stay local and ignored.
 
-Electron renderer is sandboxed and isolated, with no Node access or network requests. A narrow preload exposes validated IPC methods. The main process checks the sender and uses `execFile` with an absolute trusted CLI path, separate arguments, no shell, bounded output, and timeouts. Device names are rendered as text. No tokens, private keys, or account passwords are read. No device inventory is saved by the app. There is no generic shell or arbitrary URL launcher exposed to the renderer.
+The renderer is sandboxed, with no Node/network access. Narrow IPC validates operations and peers. Only the bundled CLI is called, with explicit arguments and Taildesk's protected pipe; no fallback to the official install or PATH. Sign-in permits only HTTPS authentication URLs on login.tailscale.com. Privileged service actions require the fixed Program Files location and an allowlisted action.
 
-The `lint` task runs Node syntax checks; there is no additional style linter. All runtime imports are built-in Node/Electron modules. Build and test packages are development dependencies.
-
-See `docs/reconstruction.md` for REA evidence and explicit coverage limits. Windows builds are unsigned unless a signing certificate is supplied to the release workflow using `CSC_LINK` and `CSC_KEY_PASSWORD`.
+See `docs/standalone-engine.md` for current evidence. `docs/reconstruction.md` records historical v0.1 REA findings.
